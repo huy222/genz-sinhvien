@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+/* Khai báo màu sắc Gen Z trực tiếp tại đây */
+@theme {
+  --color-genz-bg: #09090b;
+  --color-genz-card: #18181b;
+  --color-genz-border: #27272a;
+  --color-neon-purple: #a855f7;
+  --color-neon-green: #22c55e;
+  --color-neon-pink: #ec4899;
+  --color-neon-yellow: #eab308;
+}
+
+/* Các tùy chỉnh chung */
+:root {
+  background-color: var(--color-genz-bg);
+  color: white;
+}
+
+body {
+  background: var(--color-genz-bg);
+}
+
+.glass-effect {
+  background: rgba(24, 24, 27, 0.6);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+/* --- HIỆU ỨNG CHẠY COMMENT --- */
+@keyframes luot-len {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-50%); } /* Chạy hết 1 lượt danh sách */
+}
+
+.chay-chu-comment {
+  animation: luot-len 10s linear infinite; /* 15 giây 1 vòng, lặp mãi mãi */
+}
+
+/* Nếu muốn rê chuột vào thì dừng lại để đọc */
+.chay-chu-comment:hover {
+  animation-play-state: paused;
+}
+/* Ẩn icon build của Next.js */
+nextjs-portal, 
+[data-nextjs-toast] {
+  display: none !important;
+}
