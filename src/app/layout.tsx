@@ -8,29 +8,24 @@ const inter = Inter({ subsets: ["latin"] });
 // Cấu hình Metadata chuẩn Server-side (Giúp Facebook/Zalo đọc được ảnh)
 export const metadata: Metadata = {
   title: "GenZ Sinh Viên | Việc Làm, Đồ Cũ & Tài Liệu",
-  description: "Nền tảng kết nối sinh viên: Tìm việc làm part-time uy tín, săn đồ cũ giá rẻ và tài liệu học tập.",
-  metadataBase: new URL('https://www.genzsinhvien.io.vn/'), // Thay bằng tên miền bạn vừa mua
+  description: "Nền tảng kết nối sinh viên: Tìm việc làm part-time uy tín, săn đồ cũ giá rẻ.",
+  metadataBase: new URL('https://www.genzsinhvien.io.vn'), // Thay bằng tên miền thật
   openGraph: {
     title: "GenZ Sinh Viên - Cộng Đồng Tin Cậy cho Sinh Viên",
     description: "Tìm việc làm - Mua đồ cũ - Tải tài liệu. Tất cả trong một!",
-    url: "https://www.genzsinhvien.io.vn/", // Thay bằng tên miền bạn vừa mua
+    url: "https://www.genzsinhvien.io.vn",
     siteName: "GenZ Sinh Viên",
     images: [
       {
-        url: "/og-image.jpg", // Tự động kết hợp với metadataBase ở trên
-        width: 1200,
-        height: 630,
+        url: "/og-image.jpg",
+        width: 1200,    // 👈 Bắt buộc có để fix lỗi bạn vừa gặp
+        height: 630,   // 👈 Bắt buộc có để fix lỗi bạn vừa gặp
         alt: "GenZ Sinh Viên Banner",
+        type: "image/jpeg", // Hoặc image/png tùy định dạng ảnh của bạn
       },
     ],
     locale: "vi_VN",
     type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "GenZ Sinh Viên",
-    description: "Nền tảng dành riêng cho sinh viên Việt Nam",
-    images: ["/og-image.jpg"],
   },
 };
 
