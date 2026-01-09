@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     siteName: "GenZ Sinh Viên",
     images: [
       {
-        url: "/og-image.jpg",
+        url: "/og-image.JPG",
         width: 1200,    // 👈 Bắt buộc có để fix lỗi bạn vừa gặp
         height: 630,   // 👈 Bắt buộc có để fix lỗi bạn vừa gặp
         alt: "GenZ Sinh Viên Banner",
