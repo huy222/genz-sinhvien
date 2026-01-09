@@ -51,16 +51,16 @@ export default function CreateJobModal({ isOpen, onClose, onSuccess }: Props) {
              </div>
              <div>
                <label className="block text-xs font-bold text-gray-400 mb-1">Tên quán/Shop</label>
-               <input type="text" placeholder="VD: Highland Coffee" value={form.employer} onChange={e => setForm({...form, employer: e.target.value})} className="w-full bg-black border border-gray-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none" />
+               <input type="text" placeholder="Tên Quán/Shop" value={form.employer} onChange={e => setForm({...form, employer: e.target.value})} className="w-full bg-black border border-gray-700 rounded-lg p-3 text-white focus:border-blue-500 outline-none" />
              </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
              <div>
-                <label className="block text-xs font-bold text-gray-400 mb-1">Mức lương</label>
+                <label className="block text-xs font-bold text-gray-400 mb-1">Mức lương VD: 25k/ 1 Giờ*</label>
                 <div className="relative">
                    <DollarSign size={14} className="absolute left-3 top-3.5 text-gray-500" />
-                   <input type="text" placeholder="VD: 25k/h" value={form.salary} onChange={e => setForm({...form, salary: e.target.value})} className="w-full bg-black border border-gray-700 rounded-lg p-3 pl-9 text-white focus:border-blue-500 outline-none" />
+                   <input type="text" placeholder="VD: 25 = 25k/ 1 giờ" value={form.salary} onChange={e => setForm({...form, salary: e.target.value})} className="w-full bg-black border border-gray-700 rounded-lg p-3 pl-9 text-white focus:border-blue-500 outline-none" />
                 </div>
              </div>
              <div>

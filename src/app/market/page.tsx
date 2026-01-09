@@ -1,10 +1,12 @@
 "use client";
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import Image from 'next/image'; 
+import { useRouter } from 'next/navigation'; // Dùng để chuyển trang
 import { 
   Search, Plus, ShoppingBag, Tag, 
   Clock, Phone, Trash2, Star, CheckCircle2, 
-  Zap, X, Crown 
+  Zap, X, Crown, Lock, LogIn 
 } from 'lucide-react';
 import CreateProductModal from '@/components/CreateProductModal';
 
@@ -24,19 +26,22 @@ const timeAgo = (dateString: string) => {
 export default function MarketPage() {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isVipModalOpen, setIsVipModalOpen] = useState(false);
+  const [showLoginRequest, setShowLoginRequest] = useState(false);
+
   const [user, setUser] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [category, setCategory] = useState('all');
-
-  // 👇 STATE MỚI: Kiểm tra xem hệ thống VIP có đang bật không
   const [isVipSystemActive, setIsVipSystemActive] = useState(false);
+
+  const router = useRouter(); // Khai báo router
 
   useEffect(() => {
     checkUser();
     fetchProducts();
-    fetchSettings(); // 👈 Gọi hàm lấy cài đặt
+    fetchSettings();
   }, []);
 
   useEffect(() => {
@@ -49,18 +54,10 @@ export default function MarketPage() {
     setUser(user);
   };
 
-  // 👇 HÀM MỚI: Đọc cài đặt từ Admin
   const fetchSettings = async () => {
     try {
-      const { data, error } = await supabase
-        .from('app_settings')
-        .select('enable_market_vip')
-        .eq('id', 1)
-        .single();
-      
-      if (data) {
-        setIsVipSystemActive(data.enable_market_vip);
-      }
+      const { data } = await supabase.from('app_settings').select('enable_market_vip').eq('id', 1).single();
+      if (data) setIsVipSystemActive(data.enable_market_vip);
     } catch (error) {
       console.error("Lỗi tải cài đặt:", error);
     }
@@ -96,11 +93,15 @@ export default function MarketPage() {
     if (error) { alert("Lỗi xóa: " + error.message); fetchProducts(); }
   };
 
-  // Chỉ Admin mới dùng hàm này trực tiếp trên giao diện
   const toggleVip = async (product: any) => {
     const newStatus = !product.is_vip;
     setProducts(prev => prev.map(p => p.id === product.id ? { ...p, is_vip: newStatus } : p));
     await supabase.from('products').update({ is_vip: newStatus }).eq('id', product.id);
+  };
+
+  // 👇 ĐÃ SỬA: Chuyển hướng sang trang /login
+  const handleLoginRedirect = () => {
+    router.push('/login'); 
   };
 
   const categories = [
@@ -127,36 +128,33 @@ export default function MarketPage() {
           Cũ người mới ta - Nơi sinh viên trao đổi, mua bán đồ dùng giá rẻ, uy tín.
         </p>
 
-        <div className="flex flex-wrap justify-center gap-4 mt-6">
-          {/* NÚT ĐĂNG BÀI */}
-          <button 
-            onClick={() => {
-              if(!user) return alert("Bạn cần đăng nhập để đăng bán!");
-              setIsModalOpen(true);
-            }}
-            className="bg-white text-black hover:bg-gray-200 px-6 py-3 rounded-full font-black uppercase tracking-widest transition shadow-lg shadow-white/10 group active:scale-95 flex items-center gap-2"
-          >
-            <Plus className="bg-black text-white rounded-full p-1 group-hover:rotate-90 transition" size={20} />
-            Đăng Tin Bán Đồ
-          </button>
-
-          {/* ⚡ NÚT GIỚI THIỆU GÓI VIP (CHỈ HIỆN KHI ADMIN BẬT) */}
-          {isVipSystemActive && (
+        {/* CHỈ HIỆN KHI ĐÃ ĐĂNG NHẬP */}
+        {user && (
+          <div className="flex flex-wrap justify-center gap-4 mt-6 animate-in fade-in zoom-in">
             <button 
-              onClick={() => setIsVipModalOpen(true)}
-              className="relative overflow-hidden bg-gradient-to-r from-yellow-600 to-yellow-400 text-black px-6 py-3 rounded-full font-black uppercase tracking-widest transition shadow-lg shadow-yellow-500/20 hover:scale-105 active:scale-95 flex items-center gap-2 animate-in fade-in zoom-in"
+              onClick={() => setIsModalOpen(true)}
+              className="bg-white text-black hover:bg-gray-200 px-6 py-3 rounded-full font-black uppercase tracking-widest transition shadow-lg shadow-white/10 group active:scale-95 flex items-center gap-2"
             >
-              <div className="absolute inset-0 bg-white/20 animate-shimmer" style={{ backgroundSize: '200% 100%' }}></div>
-              <Zap size={20} fill="black" className="animate-pulse" />
-              Dịch Vụ Ghim Bài
+              <Plus className="bg-black text-white rounded-full p-1 group-hover:rotate-90 transition" size={20} />
+              Đăng Tin Bán Đồ
             </button>
-          )}
-        </div>
+
+            {isVipSystemActive && (
+              <button 
+                onClick={() => setIsVipModalOpen(true)}
+                className="relative overflow-hidden bg-gradient-to-r from-yellow-600 to-yellow-400 text-black px-6 py-3 rounded-full font-black uppercase tracking-widest transition shadow-lg shadow-yellow-500/20 hover:scale-105 active:scale-95 flex items-center gap-2"
+              >
+                <div className="absolute inset-0 bg-white/20 animate-shimmer" style={{ backgroundSize: '200% 100%' }}></div>
+                <Zap size={20} fill="black" className="animate-pulse" />
+                Dịch Vụ Ghim Bài
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* TOOLBAR */}
       <div className="sticky top-20 z-30 max-w-7xl mx-auto mb-8 space-y-4">
-        {/* Search & Categories */}
         <div className="relative group">
            <div className="absolute -inset-0.5 bg-gradient-to-r from-pink-600 to-purple-600 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
            <div className="relative bg-[#18181b] rounded-2xl flex items-center border border-gray-800 p-1">
@@ -186,29 +184,54 @@ export default function MarketPage() {
             {products.map((product) => {
               const isOwner = user?.id === product.user_id;
               const borderClass = product.is_vip ? "border-yellow-500/70 shadow-xl shadow-yellow-500/20 scale-[1.02]" : "border-gray-800 hover:border-gray-600";
+              
+              // LOGIC HIỂN THỊ TÊN NGƯỜI DÙNG
+              const displayName = user ? (product.profiles?.username || 'Ẩn danh') : 'Thành viên (Ẩn)';
+              const displayAvatar = user ? (product.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${product.profiles?.username}&background=random`) : 'https://ui-avatars.com/api/?name=Hidden&background=333&color=fff';
+
               return (
               <div key={product.id} className={`group bg-[#18181b] rounded-3xl border overflow-hidden transition duration-300 flex flex-col relative ${borderClass}`}>
+                
                 <div className="aspect-square bg-gray-900 relative overflow-hidden">
-                  <img src={product.image_url || "https://images.unsplash.com/photo-1586769852044-692d6e37d74e"} alt={product.title} className="w-full h-full object-cover group-hover:scale-110 transition duration-500" />
-                  
-                  {/* Nhãn VIP */}
+                  <Image 
+                    src={product.image_url || "https://images.unsplash.com/photo-1586769852044-692d6e37d74e"} 
+                    alt={product.title} 
+                    fill 
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    className="object-cover group-hover:scale-110 transition duration-500" 
+                  />
                   {product.is_vip && <div className="absolute top-0 left-0 bg-yellow-400 text-black px-3 py-1 text-[10px] font-black uppercase tracking-widest flex items-center gap-1 shadow-lg z-10 rounded-br-2xl"><Zap size={12} fill="black" /> TIN NỔI BẬT</div>}
                   {!product.is_vip && <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold uppercase text-white border border-white/10 flex items-center gap-1"><Tag size={10} /> {categories.find(c => c.key === product.category)?.label || "Khác"}</div>}
                   
-                  {/* Nút Admin & Xóa */}
                   {isAdmin && <button onClick={(e) => { e.stopPropagation(); toggleVip(product); }} className={`absolute top-2 right-10 p-2 rounded-full shadow-lg z-20 transition ${product.is_vip ? 'bg-yellow-500 text-black' : 'bg-gray-900/80 text-gray-400 hover:text-yellow-400'}`}><Star size={16} fill={product.is_vip ? "black" : "none"} /></button>}
                   {(isOwner || isAdmin) && <button onClick={(e) => { e.stopPropagation(); handleDeleteProduct(product.id); }} className="absolute top-2 right-2 p-2 bg-red-600/80 text-white rounded-full opacity-0 group-hover:opacity-100 transition shadow-lg hover:bg-red-600 z-20 backdrop-blur-sm"><Trash2 size={16} /></button>}
                 </div>
-                {/* Product Info */}
+
                 <div className="p-4 flex-1 flex flex-col">
                   <h3 className={`text-sm md:text-base font-bold text-white line-clamp-2 leading-tight min-h-[2.5em] group-hover:text-pink-500 transition mb-1 ${product.is_vip ? 'text-yellow-400' : ''}`}>{product.title}</h3>
                   <div className="text-pink-500 font-black text-lg mb-3 flex items-center gap-1">{formatMoney(product.price)}</div>
+                  
                   <div className="mt-auto pt-3 border-t border-gray-800 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                       <img src={product.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${product.profiles?.username}&background=random`} className={`w-6 h-6 rounded-full border ${product.is_vip ? 'border-yellow-500' : 'border-gray-700'}`} alt="Seller" />
-                       <div className="flex flex-col"><span className="text-[10px] font-bold text-gray-300 max-w-[80px] truncate flex items-center gap-1">{product.profiles?.username}{product.profiles?.is_verified && <CheckCircle2 size={10} className="text-blue-500" />}</span><span className="text-[9px] text-gray-600 flex items-center gap-0.5"><Clock size={8}/> {timeAgo(product.created_at)}</span></div>
+                    <div className="flex items-center gap-2 overflow-hidden">
+                       <img src={displayAvatar} className={`w-6 h-6 rounded-full border ${product.is_vip ? 'border-yellow-500' : 'border-gray-700'}`} alt="Seller" />
+                       <div className="flex flex-col truncate">
+                         <span className={`text-[10px] font-bold max-w-[80px] truncate flex items-center gap-1 ${user ? 'text-gray-300' : 'text-gray-500 italic'}`}>
+                            {displayName}
+                            {user && product.profiles?.is_verified && <CheckCircle2 size={10} className="text-blue-500" />}
+                         </span>
+                         <span className="text-[9px] text-gray-600 flex items-center gap-0.5"><Clock size={8}/> {timeAgo(product.created_at)}</span>
+                       </div>
                     </div>
-                    <a href={`tel:${product.contact}`} className={`p-2 rounded-full transition shadow-lg ${product.is_vip ? 'bg-yellow-400 text-black hover:bg-yellow-300' : 'bg-white text-black hover:bg-pink-500 hover:text-white'}`}><Phone size={14} fill="currentColor" /></a>
+                    
+                    {user ? (
+                      <a href={`tel:${product.contact}`} className={`px-3 py-1.5 rounded-full text-[10px] font-bold transition flex items-center gap-1 ${product.is_vip ? 'bg-yellow-400 text-black hover:bg-yellow-300' : 'bg-white text-black hover:bg-pink-500 hover:text-white'}`}>
+                        <Phone size={10} fill="currentColor" /> {product.contact}
+                      </a>
+                    ) : (
+                      <button onClick={() => setShowLoginRequest(true)} className="px-3 py-1.5 rounded-full text-[10px] font-bold bg-gray-800 text-gray-500 flex items-center gap-1 hover:bg-gray-700">
+                        <Phone size={10} /> {product.contact.slice(0, 4)}***
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -217,10 +240,37 @@ export default function MarketPage() {
         )}
       </div>
 
-      {/* MODAL ĐĂNG BÀI */}
       <CreateProductModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSuccess={() => fetchProducts()} />
 
-      {/* 🆕 MODAL GIỚI THIỆU GÓI VIP (Chỉ hiện nếu hệ thống đang bật) */}
+      {/* MODAL YÊU CẦU ĐĂNG NHẬP */}
+      {showLoginRequest && (
+         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+           <div className="bg-[#18181b] w-full max-w-xs rounded-3xl border border-gray-800 shadow-2xl p-6 relative overflow-hidden animate-in zoom-in-95 duration-200 text-center">
+             <button onClick={() => setShowLoginRequest(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white"><X size={20}/></button>
+             
+             <div className="w-16 h-16 bg-pink-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-pink-500/20">
+               <Lock size={32} className="text-pink-500" />
+             </div>
+             
+             <h3 className="text-xl font-black text-white uppercase tracking-tight mb-2">Đăng nhập đi bạn ơi!</h3>
+             <p className="text-gray-400 text-xs mb-6 px-2">
+               Để xem được thông tin người bán (Tên, SĐT) và tránh Spam, bạn cần đăng nhập tài khoản nhé.
+             </p>
+
+             <div className="space-y-2">
+               {/* 👇 NÚT NÀY SẼ CHUYỂN QUA /LOGIN 👇 */}
+               <button onClick={handleLoginRedirect} className="w-full py-3 rounded-xl bg-pink-600 text-white font-bold text-sm uppercase tracking-wider hover:bg-pink-500 transition shadow-lg shadow-pink-500/20 flex items-center justify-center gap-2">
+                 <LogIn size={16} /> Đăng nhập ngay
+               </button>
+               <button onClick={() => setShowLoginRequest(false)} className="w-full py-3 rounded-xl bg-gray-800 text-gray-400 font-bold text-xs uppercase tracking-wider hover:bg-gray-700 transition">
+                 Để sau nhé
+               </button>
+             </div>
+           </div>
+         </div>
+      )}
+
+      {/* MODAL VIP */}
       {isVipModalOpen && isVipSystemActive && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in">
           <div className="bg-[#18181b] w-full max-w-sm rounded-3xl border border-yellow-500/30 shadow-2xl p-6 relative overflow-hidden animate-in zoom-in-95">
@@ -234,24 +284,7 @@ export default function MarketPage() {
               <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Gói Đẩy Tin VIP ⚡</h3>
               <p className="text-gray-400 text-xs mt-1">Tiếp cận hàng nghìn sinh viên mỗi ngày</p>
             </div>
-
-            <div className="space-y-3 mb-6">
-              <div className="flex items-center gap-3 bg-black/50 p-3 rounded-xl border border-gray-800">
-                <Zap className="text-yellow-500" size={20} />
-                <div className="text-sm">
-                  <p className="font-bold text-white">Top 1 Trang Chủ</p>
-                  <p className="text-[10px] text-gray-500">Luôn hiển thị ở vị trí đầu tiên</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 bg-black/50 p-3 rounded-xl border border-gray-800">
-                <Star className="text-yellow-500" size={20} />
-                <div className="text-sm">
-                  <p className="font-bold text-white">Giao Diện Nổi Bật</p>
-                  <p className="text-[10px] text-gray-500">Viền vàng, nhãn VIP, sáng rực rỡ</p>
-                </div>
-              </div>
-            </div>
-
+            
             <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 text-center mb-6">
               <p className="text-[10px] text-yellow-500 font-bold uppercase tracking-widest mb-1">Bảng giá sinh viên</p>
               <p className="text-3xl font-black text-white">10.000đ <span className="text-sm font-medium text-gray-400">/ tin</span></p>

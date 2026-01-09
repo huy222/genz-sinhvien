@@ -1,21 +1,25 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  async rewrites() {
-    return [
+  // 👇 Chỉ giữ lại phần này để ảnh hoạt động
+  images: {
+    remotePatterns: [
       {
-        source: '/he-thong-mat-24',
-        destination: '/admin',
+        protocol: 'https',
+        hostname: 'naxqiycyohltyvhxbrig.supabase.co', // Supabase của bạn
+        port: '',
+        pathname: '/**',
       },
-    ]
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'ui-avatars.com',
+      },
+    ],
   },
-  async redirects() {
-    return [
-      {
-        source: '/admin',
-        destination: '/404',
-        permanent: true,
-      },
-    ]
-  }
+  // ❌ ĐÃ XÓA PHẦN REWRITES/REDIRECTS GÂY LỖI
 };
+
 export default nextConfig;

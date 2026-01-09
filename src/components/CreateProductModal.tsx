@@ -13,13 +13,13 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Props
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // State form mặc định
+  // State form
   const [formData, setFormData] = useState({ 
     title: '', 
     price: '', 
     description: '', 
     contact: '', 
-    category: 'khac' // Mặc định là Khác
+    category: 'khac'
   });
   
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -36,48 +36,70 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Props
     }
   };
 
-  const handleSubmit = async () => {
-    if (!formData.title || !formData.price || !formData.contact) return alert("Vui lòng điền đủ thông tin!");
+ // ... (Giữ nguyên các phần import và state bên trên)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.title || !formData.price || !formData.contact) {
+        return alert("Vui lòng nhập đầy đủ các trường bắt buộc (*)");
+    }
+
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    if (!currentUser) return alert("Vui lòng đăng nhập lại!");
+
     setLoading(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Vui lòng đăng nhập lại.");
+      let finalImageUrl = "";
 
-      // 1. Upload ảnh (nếu có)
-      let imageUrl = null;
       if (imageFile) {
-        const fileName = `${Date.now()}-${imageFile.name.replace(/[^a-zA-Z0-9.]/g, '')}`;
-        const { error: uploadError } = await supabase.storage.from('products').upload(fileName, imageFile);
-        if (uploadError) throw uploadError;
-        const { data } = supabase.storage.from('products').getPublicUrl(fileName);
-        imageUrl = data.publicUrl;
+        const fileExt = imageFile.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const filePath = `products/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('products') 
+          .upload(filePath, imageFile);
+
+        if (uploadError) throw new Error("Không thể tải ảnh lên hệ thống.");
+
+        const { data: urlData } = supabase.storage.from('products').getPublicUrl(filePath);
+        finalImageUrl = urlData.publicUrl;
       }
 
-      // 2. Lưu vào Database
-      const { error: insertError } = await supabase.from('products').insert({
-        title: formData.title,
-        price: parseInt(formData.price),
-        description: formData.description,
-        contact: formData.contact,
-        category: formData.category, // Lưu đúng mã danh mục
-        image_url: imageUrl,
-        user_id: user.id,
-        is_approved: false // Chờ duyệt
-      });
+      // --- PHẦN SỬA LỖI TẠI ĐÂY ---
+      const { error } = await supabase.from('products').insert([
+        {
+          title: formData.title,
+          price: Number(formData.price),
+          description: formData.description,
+          contact: formData.contact, // ✅ Đã đổi từ contact_info thành contact
+          category: formData.category,
+          image_url: finalImageUrl,
+          user_id: currentUser.id,
+          is_approved: false, 
+          is_vip: false
+        }
+      ]);
 
-      if (insertError) throw insertError;
+      if (error) {
+        if (error.code === '23503') throw new Error("Lỗi xác thực hồ sơ. Vui lòng đăng xuất và đăng nhập lại.");
+        throw error;
+      }
 
-      alert("✅ Đăng bài thành công! Vui lòng chờ Admin duyệt bài nhé.");
-      onSuccess();
+      alert("Đã gửi bài! Vui lòng chờ Admin duyệt.");
       handleClose();
-
-    } catch (error: any) {
-      alert("Lỗi: " + error.message);
+      onSuccess();
+    } catch (err: any) {
+      console.error("Lỗi:", err);
+      alert(err.message);
     } finally {
       setLoading(false);
     }
   };
+
+// ... (Giữ nguyên phần return bên dưới)
 
   const handleClose = () => {
     setFormData({ title: '', price: '', description: '', contact: '', category: 'khac' });
@@ -95,7 +117,7 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Props
           <DollarSign className="text-pink-500" /> Đăng Bán Đồ Cũ
         </h2>
         
-        <div className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-5">
           {/* Upload Ảnh */}
           <div>
             <label className="text-[10px] font-bold text-gray-500 uppercase block mb-2">Hình ảnh sản phẩm</label>
@@ -106,9 +128,9 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Props
                 <input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handleImageSelect} />
               </label>
             ) : (
-              <div className="relative w-full h-48 rounded-2xl overflow-hidden group">
+              <div className="relative w-full h-48 rounded-2xl overflow-hidden group border border-gray-800">
                 <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
-                <button onClick={() => { setImageFile(null); setPreviewUrl(null); }} className="absolute top-2 right-2 p-1 bg-red-600 text-white rounded-full"><X size={16} /></button>
+                <button type="button" onClick={() => { setImageFile(null); setPreviewUrl(null); }} className="absolute top-2 right-2 p-1 bg-red-600 text-white rounded-full"><X size={16} /></button>
               </div>
             )}
           </div>
@@ -116,16 +138,15 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Props
           <div className="grid grid-cols-2 gap-4">
             <div>
                 <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Tên món đồ *</label>
-                <input value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="w-full bg-black border border-gray-800 rounded-xl p-3 text-white focus:border-pink-500 outline-none text-sm placeholder:text-gray-600" placeholder="VD: Giáo trình C++"/>
+                <input required value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="w-full bg-black border border-gray-800 rounded-xl p-3 text-white focus:border-pink-500 outline-none text-sm" placeholder="VD: Giáo trình C++"/>
             </div>
             <div>
                 <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Giá bán (VNĐ) *</label>
-                <input type="number" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="w-full bg-black border border-gray-800 rounded-xl p-3 text-white focus:border-pink-500 outline-none text-sm placeholder:text-gray-600" placeholder="VD: 50000"/>
+                <input required type="number" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="w-full bg-black border border-gray-800 rounded-xl p-3 text-white focus:border-pink-500 outline-none text-sm" placeholder="VD: 50.000 VNĐ"/>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-             {/* 👇 PHẦN QUAN TRỌNG: DANH MỤC ĐẦY ĐỦ */}
              <div>
                <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1 flex items-center gap-1"><Tag size={10}/> Danh mục</label>
                <select 
@@ -146,19 +167,19 @@ export default function CreateProductModal({ isOpen, onClose, onSuccess }: Props
              
              <div>
                  <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1 flex items-center gap-1"><Phone size={10}/> SĐT / Zalo *</label>
-                 <input value={formData.contact} onChange={e => setFormData({...formData, contact: e.target.value})} className="w-full bg-black border border-gray-800 rounded-xl p-3 text-white focus:border-pink-500 outline-none text-sm placeholder:text-gray-600" placeholder="09xxxx"/>
+                 <input required value={formData.contact} onChange={e => setFormData({...formData, contact: e.target.value})} className="w-full bg-black border border-gray-800 rounded-xl p-3 text-white focus:border-pink-500 outline-none text-sm" placeholder="09xxxx"/>
              </div>
           </div>
 
           <div>
               <label className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Mô tả tình trạng</label>
-              <textarea value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full bg-black border border-gray-800 rounded-xl p-3 text-white focus:border-pink-500 outline-none text-sm h-24 resize-none placeholder:text-gray-600" placeholder="Mới 99%, còn bảo hành, pass nhanh..."/>
+              <textarea value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full bg-black border border-gray-800 rounded-xl p-3 text-white focus:border-pink-500 outline-none text-sm h-24 resize-none" placeholder="Mới 99%, pass nhanh..."/>
           </div>
 
-          <button onClick={handleSubmit} disabled={loading} className="w-full bg-white text-black font-black py-4 rounded-xl hover:bg-gray-200 transition uppercase tracking-widest flex justify-center items-center gap-2 shadow-lg shadow-white/10 active:scale-95">
+          <button type="submit" disabled={loading} className="w-full bg-white text-black font-black py-4 rounded-xl hover:bg-gray-200 transition uppercase tracking-widest flex justify-center items-center gap-2 shadow-lg active:scale-95 disabled:opacity-50">
             {loading ? <Loader2 size={20} className="animate-spin text-pink-600"/> : "Đăng Bán Ngay"}
           </button>
-        </div>
+        </form>
       </div>
     </div>
   );
