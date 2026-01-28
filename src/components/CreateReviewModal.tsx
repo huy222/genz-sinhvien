@@ -1,7 +1,7 @@
 "use client";
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { X, Loader2, Send, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { X, Loader2, Send, AlertTriangle, ShieldCheck, CheckCircle } from 'lucide-react';
 
 interface Props {
   isOpen: boolean;
@@ -14,8 +14,10 @@ export default function CreateReviewModal({ isOpen, onClose, onSuccess }: Props)
   const [formData, setFormData] = useState({
     title: '',
     content: '',
-    type: 'boc_phot' // Mặc định là Phốt
+    type: 'uy_tin' // ✅ Mặc định là Uy Tín
   });
+
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
 
   if (!isOpen) return null;
 
@@ -25,20 +27,18 @@ export default function CreateReviewModal({ isOpen, onClose, onSuccess }: Props)
 
     setLoading(true);
     
-    // 1. Lấy User
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
         setLoading(false);
         return alert("Bạn cần đăng nhập để đăng bài!");
     }
 
-    // 2. Gửi dữ liệu vào bảng 'reviews'
     const { error } = await supabase.from('reviews').insert({
       title: formData.title,
       content: formData.content,
       type: formData.type,
       user_id: user.id,
-      is_approved: true
+      is_approved: false // ✅ Bắt buộc duyệt
     });
 
     setLoading(false);
@@ -46,48 +46,65 @@ export default function CreateReviewModal({ isOpen, onClose, onSuccess }: Props)
     if (error) {
       alert("Lỗi: " + error.message);
     } else {
-      setFormData({ title: '', content: '', type: 'boc_phot' });
-      onSuccess(); 
-      onClose();
+      setShowSuccessMessage(true);
+      setFormData({ title: '', content: '', type: 'uy_tin' });
+      setTimeout(() => {
+        setShowSuccessMessage(false);
+        onSuccess(); 
+        onClose();
+      }, 2000);
     }
   };
 
+  if (showSuccessMessage) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="bg-[#18181b] w-full max-w-sm rounded-2xl border border-green-500/30 p-8 text-center animate-in zoom-in-95 shadow-2xl">
+          <div className="w-16 h-16 bg-green-500/20 text-green-500 rounded-full flex items-center justify-center mx-auto mb-4 border border-green-500/30">
+            <CheckCircle size={32} />
+          </div>
+          <h3 className="text-xl font-black text-white mb-2">Đã gửi thành công!</h3>
+          <p className="text-gray-400 text-sm">
+            Bài viết đang chờ <b>Admin duyệt</b> và sẽ sớm xuất hiện.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-[#18181b] w-full max-w-lg rounded-2xl border border-gray-800 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-        
-        {/* Header Review */}
-        <div className="p-4 border-b border-gray-800 flex justify-between items-center bg-gray-900/50">
-          <h3 className="font-bold text-lg text-white">Viết Review / Bóc Phốt ✍️</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-white transition">
+      <div className="bg-[#18181b] w-full max-w-lg rounded-3xl border border-gray-800 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="p-5 border-b border-gray-800 flex justify-between items-center bg-white/5">
+          <h3 className="font-black text-lg text-white uppercase tracking-tight">Viết Review Mới ✍️</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-white transition bg-black/20 p-2 rounded-full hover:bg-white/10">
             <X size={20} />
           </button>
         </div>
 
-        {/* Form Review */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          
-          <div className="grid grid-cols-2 gap-3">
-            <button type="button" onClick={() => setFormData({ ...formData, type: 'boc_phot' })} className={`p-3 rounded-xl border flex items-center justify-center gap-2 transition ${formData.type === 'boc_phot' ? 'bg-red-500/20 border-red-500 text-red-500 font-bold' : 'border-gray-700 text-gray-400 hover:bg-gray-800'}`}>
-              <AlertTriangle size={18} /> Bóc Phốt 😡
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          <div className="grid grid-cols-2 gap-4">
+            {/* ✅ Nút Uy Tín nằm trước */}
+            <button type="button" onClick={() => setFormData({ ...formData, type: 'uy_tin' })} className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition ${formData.type === 'uy_tin' ? 'bg-green-500/10 border-green-500 text-green-500 font-bold' : 'border-gray-800 text-gray-500 hover:bg-white/5 hover:border-gray-600'}`}>
+              <ShieldCheck size={24} /> <span className="text-xs uppercase font-black">Uy Tín ✅</span>
             </button>
-            <button type="button" onClick={() => setFormData({ ...formData, type: 'hen_ho' })} className={`p-3 rounded-xl border flex items-center justify-center gap-2 transition ${formData.type === 'hen_ho' ? 'bg-green-500/20 border-green-500 text-green-500 font-bold' : 'border-gray-700 text-gray-400 hover:bg-gray-800'}`}>
-              <ShieldCheck size={18} /> Uy Tín ✅
+            <button type="button" onClick={() => setFormData({ ...formData, type: 'boc_phot' })} className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition ${formData.type === 'boc_phot' ? 'bg-red-500/10 border-red-500 text-red-500 font-bold' : 'border-gray-800 text-gray-500 hover:bg-white/5 hover:border-gray-600'}`}>
+              <AlertTriangle size={24} /> <span className="text-xs uppercase font-black">Bóc Phốt 😡</span>
             </button>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Tiêu đề</label>
-            <input type="text" placeholder="Ví dụ: Cảnh báo trọ hẻm 51..." className="w-full bg-black border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-purple-500 transition" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} />
+            <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-widest">Tiêu đề</label>
+            <input type="text" placeholder="Ví dụ: Review quán cơm ngon..." className="w-full bg-black/50 border border-gray-800 rounded-xl p-4 text-white focus:outline-none focus:border-purple-500 transition text-sm font-bold" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-gray-500 mb-1 uppercase">Nội dung</label>
-            <textarea rows={5} placeholder="Kể chi tiết trải nghiệm..." className="w-full bg-black border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-purple-500 transition resize-none" value={formData.content} onChange={(e) => setFormData({ ...formData, content: e.target.value })} />
+            <label className="block text-[10px] font-black text-gray-500 mb-2 uppercase tracking-widest">Nội dung</label>
+            <textarea rows={5} placeholder="Chia sẻ chi tiết..." className="w-full bg-black/50 border border-gray-800 rounded-xl p-4 text-white focus:outline-none focus:border-purple-500 transition resize-none text-sm" value={formData.content} onChange={(e) => setFormData({ ...formData, content: e.target.value })} />
           </div>
 
-          <button type="submit" disabled={loading} className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-xl transition flex items-center justify-center gap-2 disabled:opacity-50">
-            {loading ? <Loader2 className="animate-spin" /> : <><Send size={18} /> Đăng Bài Ngay</>}
+          <button type="submit" disabled={loading} className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:brightness-110 text-white font-black py-4 rounded-xl transition flex items-center justify-center gap-2 disabled:opacity-50 uppercase tracking-widest text-xs shadow-lg shadow-purple-500/20 active:scale-95">
+            {loading ? <Loader2 className="animate-spin" /> : <><Send size={16} /> Gửi bài ngay</>}
           </button>
         </form>
       </div>
