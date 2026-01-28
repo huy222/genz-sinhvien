@@ -16,7 +16,15 @@ export default function SignupPage() {
     e.preventDefault();
     const lowerEmail = email.toLowerCase().trim();
     const cleanUsername = username.trim();
-    
+    const forbiddenKeywords = ['admin', 'quanly', 'admin1', 'admin2', 'root', 'support'];
+
+const isForbidden = forbiddenKeywords.some(keyword => 
+    username.toLowerCase().includes(keyword)
+  );
+  if (isForbidden) {
+    alert("Tên đăng nhập không hợp lệ. Vui lòng chọn tên khác!");
+    return;
+  }
     setLoading(true);
 
     try {

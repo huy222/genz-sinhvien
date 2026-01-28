@@ -150,8 +150,48 @@ export default function JobsPage() {
       </div>
 
       {/* JOBS LIST */}
-      <div className="max-w-4xl mx-auto space-y-4">
-        {loading ? (
+      {/* JOBS LIST */}
+<div className="max-w-4xl mx-auto space-y-4">
+  {loading ? (
+    // HIỆU ỨNG SKELETON KHI ĐANG TẢI
+    <div className="space-y-4 animate-in fade-in duration-500">
+      {[...Array(5)].map((_, i) => (
+        <div key={i} className="bg-[#18181b] rounded-3xl p-6 border border-gray-800 flex flex-col md:flex-row gap-6">
+          {/* Skeleton Icon Box */}
+          <div className="w-16 h-16 rounded-2xl bg-gray-800/50 animate-pulse flex-shrink-0" />
+          
+          <div className="flex-1 space-y-4">
+            <div className="flex justify-between items-start">
+              <div className="space-y-2">
+                {/* Skeleton Title */}
+                <div className="h-6 w-48 md:w-64 bg-gray-800/50 rounded-lg animate-pulse" />
+                {/* Skeleton Badges */}
+                <div className="flex gap-4">
+                  <div className="h-4 w-20 bg-gray-800/30 rounded animate-pulse" />
+                  <div className="h-4 w-24 bg-gray-800/30 rounded animate-pulse" />
+                  <div className="h-4 w-16 bg-gray-800/30 rounded animate-pulse" />
+                </div>
+              </div>
+            </div>
+            {/* Skeleton Description */}
+            <div className="space-y-2">
+              <div className="h-3 w-full bg-gray-800/20 rounded animate-pulse" />
+              <div className="h-3 w-3/4 bg-gray-800/20 rounded animate-pulse" />
+            </div>
+            {/* Skeleton Footer */}
+            <div className="flex justify-between items-center pt-4 border-t border-white/5">
+              <div className="flex items-center gap-2">
+                <div className="w-6 h-6 rounded-full bg-gray-800/50 animate-pulse" />
+                <div className="h-3 w-20 bg-gray-800/30 rounded animate-pulse" />
+              </div>
+              <div className="h-10 w-32 bg-gray-800/50 rounded-xl animate-pulse" />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  ) : jobs.length === 0 ? (
+    // ... phần giữ nguyên cũ
            <div className="flex flex-col items-center py-20">
              <Loader2 className="animate-spin text-blue-500 mb-4" size={40} />
              <p className="text-gray-500 font-medium animate-pulse">Đang tải danh sách việc làm...</p>
