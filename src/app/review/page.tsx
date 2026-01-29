@@ -2,7 +2,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-// 👇 Đã thêm BookOpen vào import
 import { 
   ArrowLeft, ShieldCheck, AlertTriangle, Search, Heart, Plus, Flame, 
   MessageSquare, Trash2, Loader2, BookOpen 
@@ -34,7 +33,6 @@ export default function ReviewPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all'); 
 
-  // --- 1. KIỂM TRA USER ---
   useEffect(() => {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -43,14 +41,13 @@ export default function ReviewPage() {
     checkUser();
   }, []);
 
-  // --- 2. FETCH DATA ---
   const fetchReviews = useCallback(async () => {
     setLoading(true);
     try {
       let query = supabase
         .from('reviews')
         .select('*, profiles(username, avatar_url, is_verified)')
-        .eq('is_approved', true) // Chỉ lấy bài đã duyệt
+        .eq('is_approved', true) 
         .order('created_at', { ascending: false });
 
       if (searchTerm.trim()) {
@@ -76,7 +73,6 @@ export default function ReviewPage() {
     return () => clearTimeout(delaySearch);
   }, [fetchReviews]);
 
-  // --- 3. ACTIONS ---
   const toggleLikePost = async (reviewId: number, currentLikes: string[] | null) => {
     if (!user) return alert("Bạn cần đăng nhập để thả tim nhé!");
     const userId = user.id;
@@ -84,7 +80,6 @@ export default function ReviewPage() {
     const newLikes = likesArray.includes(userId) 
       ? likesArray.filter(id => id !== userId) 
       : [...likesArray, userId];
-    
     setReviews(prev => prev.map(r => r.id === reviewId ? { ...r, liked_by: newLikes } : r));
     await supabase.from('reviews').update({ liked_by: newLikes }).eq('id', reviewId);
   };
@@ -103,7 +98,6 @@ export default function ReviewPage() {
 
   const hotReviews = [...reviews].sort((a, b) => ((b.liked_by?.length || 0) - (a.liked_by?.length || 0))).slice(0, 5);
 
-  // --- 4. HÀM RENDER BADGE (NHÃN) ---
   const renderBadge = (type: string) => {
     switch (type) {
       case 'boc_phot':
@@ -137,22 +131,17 @@ export default function ReviewPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 max-w-7xl mx-auto">
-        
-        {/* CỘT TRÁI: DANH SÁCH BÀI VIẾT */}
         <div className="lg:col-span-2 space-y-8">
           
-          {/* BỘ LỌC & TÌM KIẾM */}
           <div className="bg-[#18181b]/80 backdrop-blur-xl p-3 rounded-3xl border border-white/5 sticky top-24 z-30 shadow-2xl">
               <div className="relative mb-3">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
                 <input type="text" placeholder="Tìm kiếm địa điểm, nội dung..." className="w-full bg-black border border-white/5 rounded-2xl py-4 pl-12 text-sm focus:border-purple-500 transition outline-none" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
               </div>
-              
-              {/* 👇 CẬP NHẬT BỘ LỌC: BÀI VIẾT -> UY TÍN -> PHỐT */}
               <div className="flex gap-2 bg-black p-1.5 rounded-2xl overflow-x-auto">
                  {[
                    { id: 'all', label: 'Tất cả', icon: null },
-                   { id: 'chia_se', label: 'Bài Viết', icon: BookOpen, color: 'text-blue-500' }, // Mới
+                   { id: 'chia_se', label: 'Bài Viết', icon: BookOpen, color: 'text-blue-500' }, 
                    { id: 'uy_tin', label: 'Uy tín', icon: ShieldCheck, color: 'text-green-500' },
                    { id: 'boc_phot', label: 'Phốt', icon: AlertTriangle, color: 'text-red-500' }
                  ].map((tab) => (
@@ -163,7 +152,6 @@ export default function ReviewPage() {
               </div>
           </div>
 
-          {/* LIST BÀI VIẾT */}
           {loading ? (
              <div className="flex flex-col items-center py-20 gap-4">
                 <Loader2 className="animate-spin text-purple-500" size={32} />
@@ -179,6 +167,9 @@ export default function ReviewPage() {
               const isLiked = review.liked_by?.includes(user?.id);
               const isOwner = user?.id === review.user_id;
 
+              // 👇 CHECK XEM CÓ PHẢI BÀI CHIA SẺ KHÔNG ĐỂ ĐỔI GIAO DIỆN
+              const isStatusPost = review.type === 'chia_se';
+
               return (
                 <div key={review.id} className="bg-[#18181b] p-6 md:p-8 rounded-[2.5rem] border border-white/5 hover:border-white/10 transition-all group relative overflow-hidden shadow-lg">
                   <div className="flex justify-between items-start mb-6">
@@ -189,7 +180,6 @@ export default function ReviewPage() {
                        <div>
                           <div className="flex items-center gap-3">
                             <h3 className="font-black text-sm uppercase tracking-tighter">{review.profiles?.username || "Ẩn danh"}</h3>
-                            {/* 👇 RENDER BADGE THEO TYPE */}
                             {renderBadge(review.type)}
                           </div>
                           <p className="text-[10px] text-gray-500 font-bold mt-1 uppercase italic opacity-60">{timeAgo(review.created_at)}</p>
@@ -197,8 +187,18 @@ export default function ReviewPage() {
                     </div>
                   </div>
 
-                  <h3 className="font-black text-2xl text-white mb-4 leading-tight uppercase tracking-tighter">{review.title}</h3>
-                  <p className="text-gray-400 leading-relaxed mb-6 whitespace-pre-line text-sm md:text-base">{review.content}</p>
+                  {/* 👇 LOGIC SỬA LỖI TRÙNG LẶP Ở ĐÂY */}
+                  {/* Nếu KHÔNG phải bài "Chia sẻ" thì mới hiện Tiêu đề (Vì bài Chia sẻ tiêu đề là tự sinh) */}
+                  {!isStatusPost && (
+                    <h3 className="font-black text-2xl text-white mb-4 leading-tight uppercase tracking-tighter">
+                      {review.title}
+                    </h3>
+                  )}
+
+                  {/* Nội dung bài viết: Nếu là Chia sẻ thì chữ To hơn, màu Trắng sáng */}
+                  <p className={`whitespace-pre-line leading-relaxed mb-6 ${isStatusPost ? 'text-lg md:text-xl font-medium text-white/90' : 'text-sm md:text-base text-gray-400'}`}>
+                    {review.content}
+                  </p>
 
                   {review.image_url && (
                     <div className="mb-6 rounded-3xl overflow-hidden border border-white/5 shadow-2xl">
@@ -234,7 +234,6 @@ export default function ReviewPage() {
           )}
         </div>
 
-        {/* CỘT PHẢI: XU HƯỚNG */}
         <div className="lg:col-span-1 hidden lg:block">
           <div className="bg-[#18181b] rounded-[2.5rem] border border-white/5 p-8 sticky top-24 shadow-2xl">
             <h3 className="text-xs font-black text-gray-500 uppercase tracking-[0.3em] flex items-center gap-3 mb-8">
