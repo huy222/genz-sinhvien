@@ -1,13 +1,17 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-// 👇 Đã thêm Trash2 (Thùng rác)
-import { ArrowLeft, ShieldCheck, AlertTriangle, Search, Heart, Plus, Flame, MessageCircle, Trash2 } from 'lucide-react'; 
+// 👇 Đã thêm BookOpen vào import
+import { 
+  ArrowLeft, ShieldCheck, AlertTriangle, Search, Heart, Plus, Flame, 
+  MessageSquare, Trash2, Loader2, BookOpen 
+} from 'lucide-react'; 
 import CreateReviewModal from '@/components/CreateReviewModal';
 import CommentSection from '@/components/CommentSection';
 
 const timeAgo = (dateString: string) => {
+  if (!dateString) return "Vừa xong";
   const seconds = Math.floor((new Date().getTime() - new Date(dateString).getTime()) / 1000);
   let interval = seconds / 31536000;
   if (interval > 1) return Math.floor(interval) + " năm trước";
@@ -24,13 +28,13 @@ const timeAgo = (dateString: string) => {
 
 export default function ReviewPage() {
   const [reviews, setReviews] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [user, setUser] = useState<any>(null); 
-  
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all'); 
 
+  // --- 1. KIỂM TRA USER ---
   useEffect(() => {
     const checkUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -39,29 +43,42 @@ export default function ReviewPage() {
     checkUser();
   }, []);
 
+  // --- 2. FETCH DATA ---
+  const fetchReviews = useCallback(async () => {
+    setLoading(true);
+    try {
+      let query = supabase
+        .from('reviews')
+        .select('*, profiles(username, avatar_url, is_verified)')
+        .eq('is_approved', true) // Chỉ lấy bài đã duyệt
+        .order('created_at', { ascending: false });
+
+      if (searchTerm.trim()) {
+        query = query.or(`title.ilike.%${searchTerm}%,content.ilike.%${searchTerm}%`);
+      }
+      
+      if (filterType !== 'all') {
+        query = query.eq('type', filterType);
+      }
+      
+      const { data, error } = await query;
+      if (error) throw error;
+      setReviews(data || []);
+    } catch (err) {
+      console.error("Lỗi fetch reviews:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [searchTerm, filterType]);
+
   useEffect(() => {
     const delaySearch = setTimeout(() => { fetchReviews(); }, 500);
     return () => clearTimeout(delaySearch);
-  }, [searchTerm, filterType]);
+  }, [fetchReviews]);
 
-  const fetchReviews = async () => {
-    setLoading(true);
-    let query = supabase
-      .from('reviews')
-      .select('*, profiles(username, avatar_url, is_verified)')
-      .eq('is_approved', true)
-      .order('created_at', { ascending: false });
-
-    if (searchTerm.trim()) query = query.or(`title.ilike.%${searchTerm}%,content.ilike.%${searchTerm}%`);
-    if (filterType !== 'all') query = query.eq('type', filterType);
-    
-    const { data } = await query;
-    if (data) setReviews(data);
-    setLoading(false);
-  };
-
+  // --- 3. ACTIONS ---
   const toggleLikePost = async (reviewId: number, currentLikes: string[] | null) => {
-    if (!user) return alert("Đăng nhập để thả tim nhé!");
+    if (!user) return alert("Bạn cần đăng nhập để thả tim nhé!");
     const userId = user.id;
     const likesArray = currentLikes || [];
     const newLikes = likesArray.includes(userId) 
@@ -72,147 +89,168 @@ export default function ReviewPage() {
     await supabase.from('reviews').update({ liked_by: newLikes }).eq('id', reviewId);
   };
 
-  // 🗑️ HÀM XÓA BÀI VIẾT
   const handleDeleteReview = async (reviewId: number) => {
-    if (!confirm("Bạn có chắc muốn xóa bài viết này không? Hành động này không thể hoàn tác.")) return;
-
-    // 1. Xóa trên giao diện trước (Optimistic)
+    if (!confirm("⚠️ Bạn có chắc muốn xóa bài viết này vĩnh viễn không?")) return;
     setReviews(prev => prev.filter(r => r.id !== reviewId));
-
-    // 2. Gửi lệnh xóa lên server
     const { error } = await supabase.from('reviews').delete().eq('id', reviewId);
-
     if (error) {
       alert("Lỗi khi xóa: " + error.message);
-      fetchReviews(); // Tải lại nếu xóa lỗi
+      fetchReviews();
+    } else {
+      alert("Đã xóa bài viết thành công.");
     }
   };
 
   const hotReviews = [...reviews].sort((a, b) => ((b.liked_by?.length || 0) - (a.liked_by?.length || 0))).slice(0, 5);
 
+  // --- 4. HÀM RENDER BADGE (NHÃN) ---
+  const renderBadge = (type: string) => {
+    switch (type) {
+      case 'boc_phot':
+        return <span className="text-[10px] bg-red-500/10 text-red-500 px-2 py-0.5 rounded border border-red-500/20 font-black uppercase flex items-center gap-1"><AlertTriangle size={10}/> Phốt</span>;
+      case 'uy_tin':
+        return <span className="text-[10px] bg-green-500/10 text-green-500 px-2 py-0.5 rounded border border-green-500/20 font-black uppercase flex items-center gap-1"><ShieldCheck size={10}/> Uy Tín</span>;
+      case 'chia_se':
+        return <span className="text-[10px] bg-blue-500/10 text-blue-500 px-2 py-0.5 rounded border border-blue-500/20 font-black uppercase flex items-center gap-1"><BookOpen size={10}/> Chia sẻ</span>;
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#09090b] text-white p-4 md:p-8 pt-24">
-      <Link href="/" className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition">
-        <ArrowLeft size={20} /> Quay lại trang chủ
+      <Link href="/" className="inline-flex items-center gap-2 text-gray-500 hover:text-white mb-8 transition-all group">
+        <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" /> 
+        <span className="text-sm font-bold uppercase tracking-widest">Trang chủ</span>
       </Link>
       
-      <div className="mb-8 text-center animate-in slide-in-from-top-4 duration-700">
-        <h1 className="text-3xl md:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 mb-2 tracking-tighter">
+      <div className="mb-12 text-center animate-in slide-in-from-top-5 duration-700">
+        <h1 className="text-4xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-purple-500 via-pink-500 to-orange-500 mb-4 tracking-tighter italic">
           GÓC CHECK VAR 🕵️
         </h1>
-        <p className="text-gray-400 text-sm">Review thật - Trải nghiệm thật - Không seeding</p>
+        <p className="text-gray-500 text-xs font-bold uppercase tracking-[0.3em]">Review thật - Trải nghiệm thật - Vĩnh Long City</p>
         
-        <button onClick={() => {
-            if(!user) return alert("Vui lòng đăng nhập để viết bài!");
-            setIsModalOpen(true);
-          }} 
-          className="bg-white text-black hover:bg-gray-200 px-6 py-3 rounded-full font-bold transition flex items-center gap-2 mx-auto mt-6 shadow-lg shadow-white/10 group active:scale-95">
-          <div className="bg-black text-white rounded-full p-1 group-hover:rotate-90 transition"><Plus size={14} /></div>
-          Viết Review Mới
+        <button onClick={() => user ? setIsModalOpen(true) : alert("Vui lòng đăng nhập để đăng bài!")} 
+          className="bg-white text-black hover:bg-orange-500 hover:text-white px-8 py-3 rounded-full font-black transition-all flex items-center gap-3 mx-auto mt-8 shadow-xl active:scale-95 uppercase text-xs tracking-widest">
+          <Plus size={18} /> Viết Bài Ngay
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 max-w-7xl mx-auto">
         
-        {/* CỘT TRÁI: FEED */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-[#18181b] p-2 rounded-2xl border border-[#27272a] shadow-xl sticky top-24 z-20 backdrop-blur-md bg-opacity-80">
-             <div className="relative mb-2">
-               <Search className="absolute left-3 top-3.5 text-gray-500" size={18} />
-               <input type="text" placeholder="Tìm kiếm địa điểm, tên quán..." className="w-full bg-[#09090b] border border-gray-800 rounded-xl py-3 pl-10 text-white focus:outline-none focus:border-purple-500 transition" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-             </div>
-             <div className="grid grid-cols-3 gap-1 bg-[#09090b] p-1 rounded-xl border border-gray-800">
-                <button onClick={() => setFilterType('all')} className={`py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition ${filterType === 'all' ? 'bg-gray-700 text-white' : 'text-gray-500 hover:text-gray-300'}`}>Tất cả</button>
-                <button onClick={() => setFilterType('hen_ho')} className={`py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition flex items-center justify-center gap-2 ${filterType === 'hen_ho' ? 'bg-green-600 text-white' : 'text-gray-500 hover:text-green-500'}`}><ShieldCheck size={14} /> Uy tín</button>
-                <button onClick={() => setFilterType('boc_phot')} className={`py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition flex items-center justify-center gap-2 ${filterType === 'boc_phot' ? 'bg-red-600 text-white' : 'text-gray-500 hover:text-red-500'}`}><AlertTriangle size={14} /> Phốt</button>
-             </div>
+        {/* CỘT TRÁI: DANH SÁCH BÀI VIẾT */}
+        <div className="lg:col-span-2 space-y-8">
+          
+          {/* BỘ LỌC & TÌM KIẾM */}
+          <div className="bg-[#18181b]/80 backdrop-blur-xl p-3 rounded-3xl border border-white/5 sticky top-24 z-30 shadow-2xl">
+              <div className="relative mb-3">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={18} />
+                <input type="text" placeholder="Tìm kiếm địa điểm, nội dung..." className="w-full bg-black border border-white/5 rounded-2xl py-4 pl-12 text-sm focus:border-purple-500 transition outline-none" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+              </div>
+              
+              {/* 👇 CẬP NHẬT BỘ LỌC: BÀI VIẾT -> UY TÍN -> PHỐT */}
+              <div className="flex gap-2 bg-black p-1.5 rounded-2xl overflow-x-auto">
+                 {[
+                   { id: 'all', label: 'Tất cả', icon: null },
+                   { id: 'chia_se', label: 'Bài Viết', icon: BookOpen, color: 'text-blue-500' }, // Mới
+                   { id: 'uy_tin', label: 'Uy tín', icon: ShieldCheck, color: 'text-green-500' },
+                   { id: 'boc_phot', label: 'Phốt', icon: AlertTriangle, color: 'text-red-500' }
+                 ].map((tab) => (
+                   <button key={tab.id} onClick={() => setFilterType(tab.id)} className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 min-w-[90px] ${filterType === tab.id ? 'bg-white/10 text-white shadow-inner' : 'text-gray-500 hover:text-gray-300'}`}>
+                     {tab.icon && <tab.icon size={14} className={tab.color} />} {tab.label}
+                   </button>
+                 ))}
+              </div>
           </div>
 
-          {loading ? [1,2].map(i => <div key={i} className="h-40 bg-[#18181b] rounded-2xl animate-pulse"></div>) 
-          : reviews.length === 0 ? (
-            <div className="text-center py-20 text-gray-500 italic">Chưa có bài review nào.</div>
+          {/* LIST BÀI VIẾT */}
+          {loading ? (
+             <div className="flex flex-col items-center py-20 gap-4">
+                <Loader2 className="animate-spin text-purple-500" size={32} />
+                <p className="text-gray-500 text-xs font-bold uppercase tracking-widest">Đang quét dữ liệu...</p>
+             </div>
+          ) : reviews.length === 0 ? (
+            <div className="bg-[#18181b] rounded-3xl p-20 text-center border border-dashed border-gray-800">
+               <p className="text-gray-500 font-bold italic">Chưa có bài viết nào ở mục này.</p>
+               <p className="text-xs text-gray-600 mt-2">Hãy là người đầu tiên chia sẻ!</p>
+            </div>
           ) : (
             reviews.map((review) => {
-            const isLiked = review.liked_by?.includes(user?.id);
-            // 👇 Kiểm tra xem user hiện tại có phải chủ bài viết không
-            const isOwner = user?.id === review.user_id;
+              const isLiked = review.liked_by?.includes(user?.id);
+              const isOwner = user?.id === review.user_id;
 
-            return (
-            <div key={review.id} className="bg-[#18181b] p-6 rounded-3xl border border-[#27272a] hover:border-gray-700 transition duration-300 group">
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex items-center gap-3">
-                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 p-[2px]">
-                      <img src={review.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${review.profiles?.username || 'U'}&background=random`} className="w-full h-full rounded-full object-cover border-2 border-[#18181b]" alt="user"/>
-                   </div>
-                   <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-bold text-sm text-white">{review.profiles?.username || "Ẩn danh"}</h3>
-                        {review.type === 'boc_phot' ? (
-                          <span className="text-[10px] bg-red-500/10 text-red-500 px-2 py-0.5 rounded border border-red-500/20 font-black uppercase">Phốt</span>
-                        ) : (
-                          <span className="text-[10px] bg-green-500/10 text-green-500 px-2 py-0.5 rounded border border-green-500/20 font-black uppercase">Uy tín</span>
-                        )}
-                      </div>
-                      <p className="text-[10px] text-gray-500">{timeAgo(review.created_at)}</p>
-                   </div>
-                </div>
-              </div>
-
-              <h3 className="font-black text-xl text-white mb-2 leading-tight">{review.title}</h3>
-              <p className="text-gray-300 leading-relaxed mb-4 whitespace-pre-line text-sm">{review.content}</p>
-
-              {review.image_url && (
-                <div className="mb-4 rounded-xl overflow-hidden border border-gray-800">
-                  <img src={review.image_url} alt="Review" className="w-full object-cover max-h-[400px]" />
-                </div>
-              )}
-
-              <div className="flex items-center justify-between pt-4 border-t border-gray-800">
-                <div className="flex items-center gap-4">
-                    {/* Nút Like */}
-                    <button onClick={() => toggleLikePost(review.id, review.liked_by || [])} className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition ${isLiked ? 'text-pink-500 bg-pink-500/10' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}>
-                        <Heart size={18} fill={isLiked ? "currentColor" : "none"} className={isLiked ? "animate-bounce" : ""} />
-                        <span className="text-xs font-bold">{review.liked_by?.length || 0}</span>
-                    </button>
-
-                    {/* Nút Bình luận */}
-                    <div className="flex items-center gap-2 text-gray-500 px-3 py-1.5 cursor-pointer hover:text-white transition">
-                        <MessageCircle size={18} />
-                        <span className="text-xs font-bold">Bình luận</span>
+              return (
+                <div key={review.id} className="bg-[#18181b] p-6 md:p-8 rounded-[2.5rem] border border-white/5 hover:border-white/10 transition-all group relative overflow-hidden shadow-lg">
+                  <div className="flex justify-between items-start mb-6">
+                    <div className="flex items-center gap-4">
+                       <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 to-pink-600 p-[2px] shadow-lg">
+                          <img src={review.profiles?.avatar_url || `https://ui-avatars.com/api/?name=${review.profiles?.username || 'U'}&background=random`} className="w-full h-full rounded-2xl object-cover border-4 border-[#18181b]" alt="avatar"/>
+                       </div>
+                       <div>
+                          <div className="flex items-center gap-3">
+                            <h3 className="font-black text-sm uppercase tracking-tighter">{review.profiles?.username || "Ẩn danh"}</h3>
+                            {/* 👇 RENDER BADGE THEO TYPE */}
+                            {renderBadge(review.type)}
+                          </div>
+                          <p className="text-[10px] text-gray-500 font-bold mt-1 uppercase italic opacity-60">{timeAgo(review.created_at)}</p>
+                       </div>
                     </div>
+                  </div>
+
+                  <h3 className="font-black text-2xl text-white mb-4 leading-tight uppercase tracking-tighter">{review.title}</h3>
+                  <p className="text-gray-400 leading-relaxed mb-6 whitespace-pre-line text-sm md:text-base">{review.content}</p>
+
+                  {review.image_url && (
+                    <div className="mb-6 rounded-3xl overflow-hidden border border-white/5 shadow-2xl">
+                      <img src={review.image_url} alt="Review" className="w-full object-cover max-h-[500px] hover:scale-105 transition-transform duration-700" />
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-between pt-6 border-t border-white/5">
+                    <div className="flex items-center gap-2 md:gap-6">
+                        <button onClick={() => toggleLikePost(review.id, review.liked_by)} className={`flex items-center gap-2 px-4 py-2 rounded-2xl transition-all ${isLiked ? 'text-pink-500 bg-pink-500/10' : 'text-gray-500 hover:text-white hover:bg-white/5'}`}>
+                            <Heart size={20} fill={isLiked ? "currentColor" : "none"} className={isLiked ? "animate-pulse" : ""} />
+                            <span className="text-sm font-black">{review.liked_by?.length || 0}</span>
+                        </button>
+                        <div className="flex items-center gap-2 text-gray-500 px-4 py-2 rounded-2xl hover:bg-white/5 transition-all cursor-pointer">
+                            <MessageSquare size={20} />
+                            <span className="text-sm font-black">Phản hồi</span>
+                        </div>
+                    </div>
+
+                    {isOwner && (
+                        <button onClick={() => handleDeleteReview(review.id)} className="p-3 text-gray-600 hover:text-red-500 hover:bg-red-500/10 rounded-2xl transition-all shadow-sm" title="Xóa bài viết">
+                            <Trash2 size={20} />
+                        </button>
+                    )}
+                  </div>
+                  
+                  <div className="mt-6">
+                    <CommentSection reviewId={review.id} />
+                  </div>
                 </div>
-
-                {/* 👇 NÚT XÓA BÀI (Chỉ hiện nếu là chủ bài viết) */}
-                {isOwner && (
-                    <button 
-                        onClick={() => handleDeleteReview(review.id)}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded-full text-gray-500 hover:text-red-500 hover:bg-red-500/10 transition text-xs font-bold"
-                    >
-                        <Trash2 size={16} /> Xóa bài
-                    </button>
-                )}
-              </div>
-
-              <CommentSection reviewId={review.id} />
-            </div>
-          )}))}
+              );
+            })
+          )}
         </div>
 
-        {/* CỘT PHẢI (SIDEBAR) */}
+        {/* CỘT PHẢI: XU HƯỚNG */}
         <div className="lg:col-span-1 hidden lg:block">
-          <div className="bg-[#18181b] rounded-2xl border border-[#27272a] p-6 sticky top-24">
-            <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest flex items-center gap-2 mb-6">
-              <Flame size={16} className="text-orange-500"/> Chủ đề Nóng
+          <div className="bg-[#18181b] rounded-[2.5rem] border border-white/5 p-8 sticky top-24 shadow-2xl">
+            <h3 className="text-xs font-black text-gray-500 uppercase tracking-[0.3em] flex items-center gap-3 mb-8">
+              <Flame size={18} className="text-orange-500 animate-pulse"/> Xu hướng hóng hớt
             </h3>
-            <div className="space-y-5">
-              {hotReviews.length === 0 ? <p className="text-gray-500 text-xs italic">Chưa có bài nào hot.</p> : 
+            <div className="space-y-8">
+              {hotReviews.length === 0 ? <p className="text-gray-600 text-xs italic">Chưa có bài nào hot...</p> : 
                hotReviews.map((hot, idx) => (
-                <div key={hot.id} className="flex gap-4 items-start group cursor-pointer">
-                  <span className={`text-3xl font-black opacity-50 ${idx === 0 ? 'text-yellow-500' : idx === 1 ? 'text-gray-400' : 'text-orange-800'}`}>{idx + 1}</span>
+                <div key={hot.id} className="flex gap-5 items-start group cursor-pointer">
+                  <span className={`text-4xl font-black italic opacity-20 group-hover:opacity-100 transition-opacity ${idx === 0 ? 'text-orange-500' : 'text-gray-500'}`}>{idx + 1}</span>
                   <div>
-                    <p className="text-sm font-bold text-white line-clamp-2 group-hover:text-purple-400 transition leading-snug">{hot.title}</p>
-                    <div className="flex items-center gap-2 mt-2 text-[10px] text-gray-500 font-bold uppercase tracking-wide">
-                      <span className="flex items-center gap-1"><Heart size={10} /> {hot.liked_by?.length || 0} Likes</span>
+                    <p className="text-sm font-black text-white line-clamp-2 group-hover:text-purple-400 transition-all leading-tight uppercase tracking-tighter">{hot.title}</p>
+                    <div className="flex items-center gap-3 mt-2 text-[9px] text-gray-500 font-black uppercase tracking-widest">
+                      <span className="flex items-center gap-1"><Heart size={10} fill="currentColor"/> {hot.liked_by?.length || 0}</span>
+                      <span>•</span>
+                      <span>{timeAgo(hot.created_at)}</span>
                     </div>
                   </div>
                 </div>
